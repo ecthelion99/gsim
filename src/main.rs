@@ -74,7 +74,7 @@ fn setup (
     //mesh
     commands.spawn((
         MaterialMesh2dBundle{
-            mesh: meshes.add(arrow().into()).into(),
+            mesh: meshes.add(arrow(0.5, 0.1, 0.3).into()).into(),
             material: materials.add(Color::rgb(1.0, 1.0, 1.0).into()),
             transform: Transform {
                 translation: Vec3::new(-10.0, 0.0, -1.),
