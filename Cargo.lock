@@ -479,6 +479,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_cursor"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8211b91fd9f6dbf777fd86637e4d96026a235e8a91de7a72f4b690a46296afb"
+dependencies = [
+ "bevy",
+ "smallvec",
+]
+
+[[package]]
 name = "bevy_derive"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1912,6 +1922,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy-inspector-egui",
+ "bevy_cursor",
 ]
 
 [[package]]
