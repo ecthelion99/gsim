@@ -1,8 +1,11 @@
+mod arrows;
+
 use bevy::prelude::*;
 use bevy::sprite::{Material2d, MaterialMesh2dBundle};
 use bevy::window::PrimaryWindow;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_cursor::prelude::*;
+use arrows::arrow;
 
 fn main() {
     App::new()
@@ -30,6 +33,9 @@ struct Radius(f32);
 
 #[derive(Resource)]
 struct MousePosition(Option<Vec2>);
+
+#[derive(Component)]
+struct Arrow;
 
 #[derive(Bundle)]
 struct MassBodyBundle<M: Material2d> {
@@ -64,6 +70,20 @@ fn setup (
         },
 
     ));
+
+    //mesh
+    commands.spawn((
+        MaterialMesh2dBundle{
+            mesh: meshes.add(arrow().into()).into(),
+            material: materials.add(Color::rgb(1.0, 1.0, 1.0).into()),
+            transform: Transform {
+                translation: Vec3::new(-10.0, 0.0, -1.),
+                scale: Vec3::new(50., 50.0, 0.0),
+                rotation: Quat::from_rotation_z(std::f32::consts::PI/2.0),
+            },
+            ..Default::default()
+        },
+        ));
 }
 
 fn move_free_bodies(time: Res<Time>, mut query: Query<(&mut Transform, &Velocity), (With<PassiveBody>, Without<UserControlled>)>) {
