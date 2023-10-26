@@ -1,9 +1,8 @@
-use bevy::prelude::Mesh;
+use bevy::prelude::*;
 use bevy::render::mesh::Indices;
 use bevy::render::render_resource::PrimitiveTopology;
-use bevy::sprite::MaterialMesh2dBundle;
-
 pub fn arrow(shaft_ratio: f32, shaft_width: f32, head_width: f32 ) -> Mesh {
+
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
     let head_start = 2.0*shaft_ratio - 1.0;
     mesh.insert_attribute(
@@ -18,18 +17,6 @@ pub fn arrow(shaft_ratio: f32, shaft_width: f32, head_width: f32 ) -> Mesh {
             [-1.0, shaft_width/2.0, 0.0],
         ],
     );
-    // mesh.insert_attribute(
-    //     Mesh::ATTRIBUTE_UV_0,
-    //     vec![
-    //         [0.0, 0.0],
-    //         [0.5, 0.0],
-    //         [0.5, 0.25],
-    //         [1.0, 0.5],
-    //         [0.5, 0.75],
-    //         [0.5, 1.0],
-    //         [0.0, 1.0],
-    //     ],
-    // );
 
     mesh.insert_attribute(
         Mesh::ATTRIBUTE_NORMAL,
@@ -47,3 +34,4 @@ pub fn arrow(shaft_ratio: f32, shaft_width: f32, head_width: f32 ) -> Mesh {
     mesh.set_indices(Some(Indices::U32(vec![0, 1, 6, 1, 5, 6, 2, 3, 4])));
     mesh
 }
+
