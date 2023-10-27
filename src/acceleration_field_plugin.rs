@@ -1,4 +1,3 @@
-use std::cmp::max;
 use bevy::math::IRect;
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
@@ -17,7 +16,7 @@ impl Plugin for AccelerationFieldPlugin {
             .insert_resource(AccelerationFieldInfo {
             field_resolution: self.field_resolution,
             field_size: self.field_size,
-            max: 0.0,
+            max: f32::NEG_INFINITY,
             min: f32::INFINITY,
             })
             .add_systems(Startup, setup)
@@ -46,7 +45,6 @@ fn setup(
     mut materials: ResMut<Assets<ColorMaterial>>,
     acceleration_field_info: ResMut<AccelerationFieldInfo>,
 ) {
-        debug!("Setting up acceleration field");
         for i in acceleration_field_info.field_size.min.x ..
             acceleration_field_info.field_size.max.x {
             for j in acceleration_field_info.field_size.min.y ..
@@ -78,8 +76,6 @@ fn update_acceleration_field(
     mut query: Query<&mut AccelerationFieldPoint>,
     mass_query: Query<(&Mass, &Transform, &Radius)>,
 ) {
-    let mut max_acceleration = f32::NEG_INFINITY;
-    let mut min_acceleration = f32::INFINITY;
     for mut field_point in query.iter_mut() {
         let mut total_acceleration = Vec3::ZERO;
         for (mass, transform, radius) in mass_query.iter() {
@@ -87,21 +83,11 @@ fn update_acceleration_field(
                 total_acceleration += acceleration(transform.translation, mass.0, field_point.position);
             }
         }
-        max_acceleration = max_acceleration.max(total_acceleration.length());
-        min_acceleration = min_acceleration.min(total_acceleration.length());
         field_point.acceleration = total_acceleration;
+        field_info.max = field_info.max.max(total_acceleration.length());
+        field_info.min = field_info.min.min(total_acceleration.length());
     }
-    // bevy::log::debug!("Max acceleration: {}", field_info.max);
-    // bevy::log::debug!("Min acceleration: {}", field_info.min);
-    field_info.max = max_acceleration;
-    field_info.min = min_acceleration;
 
-}
-
-fn acceleration(point: Vec3, mass: f32, position: Vec3) -> Vec3 {
-    let distance = position - point;
-    let magnitude = G*mass/(distance.length_squared());
-    -magnitude*distance.normalize()
 }
 
 fn update_acceleration_field_arrows(
@@ -110,7 +96,7 @@ fn update_acceleration_field_arrows(
 ) {
 
     for (mut transform, field_point) in query.iter_mut() {
-        let mut scale = (field_point.acceleration.length() - field_info.min)/(field_info.max - field_info.min)*field_info.field_resolution.x;
+        let mut scale = (0.1 + (field_point.acceleration.length() - field_info.min)/(field_info.max - field_info.min))*field_info.field_resolution.x;
         transform.scale = Vec3::from_array([scale, scale, 0.]);
         transform.rotation = Quat::from_rotation_z(field_point.acceleration.y.atan2(field_point.acceleration.x));
     }
