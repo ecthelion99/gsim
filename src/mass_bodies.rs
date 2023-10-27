@@ -2,7 +2,10 @@ use bevy::prelude::*;
 use bevy::sprite::{Material2d, MaterialMesh2dBundle};
 
 #[derive(Component)]
-pub struct PassiveBody {
+pub struct PassiveBody;
+
+#[derive(Component)]
+pub struct State {
     pub position: Vec3,
     pub velocity: Vec3,
     pub acceleration: Vec3,
@@ -26,4 +29,5 @@ pub struct MassBodyBundle<M: Material2d> {
     pub radius: Radius,
     pub marker: PassiveBody,
     pub meshbundle: MaterialMesh2dBundle<M>,
+    pub state: State,
 }

@@ -1,6 +1,7 @@
-pub mod arrows;
+pub mod utils;
 mod acceleration_field_plugin;
 mod mass_bodies;
+mod constants;
 
 use bevy::input::keyboard::{KeyboardInput, KeyCode};
 use bevy::log::LogPlugin;
@@ -10,8 +11,9 @@ use bevy::sprite::{Material2d, MaterialMesh2dBundle};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_cursor::prelude::*;
 use crate::acceleration_field_plugin::AccelerationFieldPlugin;
-use crate::mass_bodies::{MassBodyBundle, Mass, Radius, Velocity, PassiveBody, UserControlled};
+use crate::mass_bodies::{MassBodyBundle, Mass, Radius, PassiveBody, UserControlled, State};
 use bevy::input::mouse::MouseWheel;
+use bevy::utils::hashbrown::HashMap;
 
 fn main() {
     App::new()
@@ -25,8 +27,8 @@ fn main() {
             field_size: IRect::new(-64, -36, 65, 37)
         })
         .add_systems(Startup, setup)
-        .add_systems(Update, (move_free_bodies, move_user_bodies, mouse_click,
-                              zoom_camera, mouse_pos_logging))
+        .add_systems(Update, (update_passivebody_states, move_user_states,
+                              update_view, mouse_click, zoom_camera))
         .run();
 }
 
@@ -38,31 +40,69 @@ fn setup (
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    commands.spawn((Camera2dBundle::default(), MainCamera));
+    let mut camera = Camera2dBundle::default();
+    camera.projection.scale = 0.25;
+    commands.spawn((camera, MainCamera));
 
-    let masses = vec![1e20, 1.2e20, 1.5e20, 2e20];
-    let radius = vec![1.0, 1.2, 1.5, 2.0];
-    for i in -2..2 {
-        commands.spawn((
-            MassBodyBundle {
-                mass: Mass(masses[(i+2) as usize]),
-                radius: Radius(radius[(i+2) as usize]),
-                velocity: Velocity(Vec3::ZERO),
-                meshbundle: MaterialMesh2dBundle {
-                    mesh: meshes.add(shape::Circle::new(radius[(i+2) as usize]).into()).into(),
-                    material: materials.add(Color::rgb(1., 69. / 255., 0.).into()),
-                    transform: Transform {
-                        translation: Vec3::new((i as f32)*20.0, 0., 0.),
-                        ..Default::default()
-                    },
+    commands.spawn((
+        MassBodyBundle {
+            mass: Mass(1e13),
+            radius: Radius(2.5),
+            meshbundle: MaterialMesh2dBundle {
+                mesh: meshes.add(shape::Circle::new(5.0).into()).into(),
+                material: materials.add(Color::rgb(1., 69. / 255., 0.).into()),
+                transform: Transform {
+                    translation: Vec3::ZERO,
                     ..Default::default()
                 },
-                marker: PassiveBody,
+                ..Default::default()
             },
-        ));
+            marker: PassiveBody,
+            state: State {
+                position: Vec3::ZERO,
+                velocity: Vec3::ZERO,
+                acceleration: Vec3::ZERO,
+            },
+        },
+    ));
+    let separation = 50.0;
+    for i in (-1..2).step_by(2){
+        for j in (-1..2).step_by(2) {
+            let radius = if i == -1 && j == -1 {2.5} else {1.5};
+            commands.spawn((
+                MassBodyBundle {
+                    mass: Mass(if i == -1 && j == -1 {1e12} else {1e11}),
+                    meshbundle: MaterialMesh2dBundle {
+                        mesh: meshes.add(shape::Circle::new(radius).into()).into(),
+                        material: materials.add(Color::rgb(0., 1., 0.).into()),
+                        transform: Transform {
+                            translation: Vec3::new(
+                                (i as f32) * separation,
+                                (j as f32) * separation,
+                                0.0,
+                            ),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
+                    radius: Radius(radius),
+                    marker: PassiveBody,
+                    state: State {
+                        position: Vec3::new(
+                            (i as f32) * separation,
+                            (j as f32) * separation,
+                            0.0,
+                        ),
+                        velocity: Vec3::ZERO,
+                        acceleration: Vec3::ZERO,
+                    },
+                },
+            ));
+        }
     }
 
 }
+
 fn scroll_events(
     mut scroll_evr: EventReader<MouseWheel>,
 ) {
@@ -112,21 +152,59 @@ fn zoom_camera(
     projection.scale = projection.scale.clamp(0.01, 5.0);
 }
 
-fn move_free_bodies(time: Res<Time>, mut query: Query<(&mut Transform, &Velocity), (With<PassiveBody>, Without<UserControlled>)>) {
-    for (mut transform, velocity) in query.iter_mut() {
-        transform.translation += velocity.0 * time.delta_seconds();
+fn update_passivebody_states(
+    time: Res<Time>,
+    mut query: Query<(&mut State, &Mass, Entity), (With<PassiveBody>, Without<UserControlled>)>,
+) {
+    // Collect data into separate vectors
+    let mut states: Vec<Mut<State>> = Vec::new();
+    let mut masses: Vec<&Mass> = Vec::new();
+    let mut entities: Vec<Entity> = Vec::new();
+
+    for (mut state, mass, entity) in query.iter_mut() {
+        states.push(state);
+        masses.push(mass);
+        entities.push(entity);
+    }
+
+    // Update accelerations
+    for i in 0..states.len() {
+        states[i].acceleration = Vec3::ZERO;
+        for j in 0..states.len() {
+            if i != j {
+                let acceleration = utils::acceleration(states[j].position, masses[j].0, states[i].position);
+                states[i].acceleration += acceleration;
+            }
+        }
+    }
+
+    // Update positions and velocities
+    for i in 0..states.len() {
+        let state = &mut *states[i];
+        state.velocity += state.acceleration * time.delta_seconds();
+        state.position += state.velocity * time.delta_seconds();
+        debug!("Entity: {:?}, velocity: {:?}", entities[i], state.velocity);
     }
 }
 
-fn move_user_bodies(
-    time: Res<Time>,
-    mut query: Query<(&mut Transform, &mut Velocity), (With<PassiveBody>, With<UserControlled>)>,
+fn update_view(
+    mut query: Query<(&mut Transform, &State)>,
+) {
+    for (mut transform, state) in query.iter_mut() {
+        transform.translation = state.position;
+    }
+}
+
+
+fn move_user_states(
+    mut query: Query<(&mut State), (With<PassiveBody>, With<UserControlled>)>,
     cursor: Res<CursorInfo>,
 ) {
         if let Some(position) = cursor.position() {
-            for (mut transform, mut velocity) in query.iter_mut() {
-                velocity.0 = (position.extend(0.0) - transform.translation)/time.delta_seconds();
-                transform.translation = position.extend(0.0)
+            for mut state in query.iter_mut() {
+                state.position = position.extend(0.0);
+                state.velocity = Vec3::ZERO;
+                state.acceleration = Vec3::ZERO;
             }
         }
 }

@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::render::mesh::Indices;
 use bevy::render::render_resource::PrimitiveTopology;
+use crate::constants::G;
 pub fn arrow(shaft_ratio: f32, shaft_width: f32, head_width: f32 ) -> Mesh {
 
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
@@ -33,5 +34,11 @@ pub fn arrow(shaft_ratio: f32, shaft_width: f32, head_width: f32 ) -> Mesh {
 
     mesh.set_indices(Some(Indices::U32(vec![0, 1, 6, 1, 5, 6, 2, 3, 4])));
     mesh
+}
+
+pub fn acceleration(point: Vec3, mass: f32, position: Vec3) -> Vec3 {
+    let distance = position - point;
+    let magnitude = G*mass/(distance.length_squared());
+    -magnitude*distance.normalize()
 }
 

@@ -1,10 +1,9 @@
 use bevy::math::IRect;
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
-use crate::arrows::arrow;
+use crate::utils::{arrow, acceleration};
 use crate::mass_bodies::*;
 
-pub const G: f32 = 6.6734e-11;
 pub struct AccelerationFieldPlugin {
     pub(crate) field_resolution: Vec2,
     pub(crate) field_size: IRect,
