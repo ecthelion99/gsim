@@ -2,6 +2,7 @@ pub mod utils;
 mod acceleration_field_plugin;
 mod mass_bodies;
 mod constants;
+mod newtonian_gravity_plugin;
 
 use bevy::input::keyboard::{KeyboardInput, KeyCode};
 use bevy::log::LogPlugin;
@@ -12,10 +13,7 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_cursor::prelude::*;
 use crate::acceleration_field_plugin::AccelerationFieldPlugin;
 use crate::mass_bodies::*;
-use bevy::input::mouse::MouseWheel;
-use bevy::utils::hashbrown::HashMap;
-use rand::random;
-use crate::constants::SOFTENING_DISTANCE;
+use crate::newtonian_gravity_plugin::{GravityAcceleration, update_gravity};
 
 fn main() {
     App::new()
@@ -24,14 +22,18 @@ fn main() {
             ..default()
         }), CursorInfoPlugin))
         .add_plugins(WorldInspectorPlugin::new())
-        .add_plugins(AccelerationFieldPlugin{
-            field_resolution: Vec2::new(2.0, 2.0),
-            field_size: IRect::new(-64, -36, 65, 37)
-        })
+        // .add_plugins(AccelerationFieldPlugin{
+        //     field_resolution: Vec2::new(5., 5.),
+        //     field_size: IRect::new(-64, -36, 65, 37),
+        //     arrow_scale: 0.5,
+        // })
         .add_event::<SetVelocityEvent>()
         .add_systems(Startup, setup)
-        .add_systems(Update, (update_body_states, move_user_states,
-                              mouse_click, zoom_camera, set_velocity))
+        .add_systems(Update,
+                     (
+                         update_gravity.before(update_bodies_euler),
+                         update_bodies_euler, move_user_states,
+                              mouse_click, zoom_camera, user_set_velocity))
         .run();
 }
 
@@ -55,17 +57,16 @@ fn setup (
                 mesh: meshes.add(shape::Circle::new(2.5).into()).into(),
                 material: materials.add(Color::rgb(1., 69. / 255., 0.).into()),
                 transform: Transform {
-                    translation: Vec3::new(85.0, 0.0, 0.0),
+                    translation: Vec3::new(-150., 0.0, 0.0),
                     ..Default::default()
                 },
                 ..Default::default()
             },
             marker: Body,
-            state: BodyState {
-                velocity: Vec3::new(0.0, 5.0, 0.0),
-                acceleration: Vec3::ZERO,
-            },
+            velocity: Velocity(Vec3::new(0.0, 16.0, 0.0)),
+            acceleration: GravityAcceleration(Vec3::ZERO),
         },
+
     ));
     commands.spawn((
         MassBodyBundle {
@@ -75,37 +76,110 @@ fn setup (
                 mesh: meshes.add(shape::Circle::new(2.5).into()).into(),
                 material: materials.add(Color::rgb(1., 69. / 255., 0.).into()),
                 transform: Transform {
-                    translation: Vec3::new(115.0, 0.0, 0.0),
+                    translation: Vec3::new(-100.0, 0.0, 0.0),
                     ..Default::default()
                 },
                 ..Default::default()
             },
             marker: Body,
-            state: BodyState {
-                velocity: Vec3::new(0.0, 3., 0.0),
-                acceleration: Vec3::ZERO,
-            },
+            velocity: Velocity(Vec3::new(0.0, -30.0, 0.0)),
+            acceleration: GravityAcceleration(Vec3::ZERO),
         },
     ));
 
     commands.spawn((
         MassBodyBundle {
-            mass: Mass(1e14),
-            radius: Radius(10.),
+            mass: Mass(1e13),
+            radius: Radius(2.5),
             meshbundle: MaterialMesh2dBundle {
-                mesh: meshes.add(shape::Circle::new(10.).into()).into(),
+                mesh: meshes.add(shape::Circle::new(2.5).into()).into(),
                 material: materials.add(Color::rgb(1., 69. / 255., 0.).into()),
                 transform: Transform {
-                    translation: Vec3::new(-50., 0.0, 0.0),
+                    translation: Vec3::new(-400.0, 0.0, 0.0),
                     ..Default::default()
                 },
                 ..Default::default()
             },
             marker: Body,
-            state: BodyState {
-                velocity: Vec3::new(0.0, 0.0, 0.0),
-                acceleration: Vec3::ZERO,
+            velocity: Velocity(Vec3::new(0.0, -10.0, 0.0)),
+            acceleration: GravityAcceleration(Vec3::ZERO),
+        },
+    ));
+
+    commands.spawn((
+        MassBodyBundle {
+            mass: Mass(1e13),
+            radius: Radius(2.5),
+            meshbundle: MaterialMesh2dBundle {
+                mesh: meshes.add(shape::Circle::new(2.5).into()).into(),
+                material: materials.add(Color::rgb(1., 69. / 255., 0.).into()),
+                transform: Transform {
+                    translation: Vec3::new(-200.0, 0.0, 0.0),
+                    ..Default::default()
+                },
+                ..Default::default()
             },
+            marker: Body,
+            velocity: Velocity(Vec3::new(0.0, -15.0, 0.0)),
+            acceleration: GravityAcceleration(Vec3::ZERO),
+        },
+    ));
+
+    commands.spawn((
+        MassBodyBundle {
+            mass: Mass(1e13),
+            radius: Radius(2.5),
+            meshbundle: MaterialMesh2dBundle {
+                mesh: meshes.add(shape::Circle::new(2.5).into()).into(),
+                material: materials.add(Color::rgb(1., 69. / 255., 0.).into()),
+                transform: Transform {
+                    translation: Vec3::new(-250.0, 0.0, 0.0),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            marker: Body,
+            velocity: Velocity(Vec3::new(0.0, -10.0, 0.0)),
+            acceleration: GravityAcceleration(Vec3::ZERO),
+        },
+    ));
+
+
+    commands.spawn((
+        MassBodyBundle {
+            mass: Mass(1e13),
+            radius: Radius(2.5),
+            meshbundle: MaterialMesh2dBundle {
+                mesh: meshes.add(shape::Circle::new(2.5).into()).into(),
+                material: materials.add(Color::rgb(1., 69. / 255., 0.).into()),
+                transform: Transform {
+                    translation: Vec3::new(-80., 0.0, 0.0),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            marker: Body,
+            velocity: Velocity(Vec3::new(0.0, 50.0, 0.0)),
+            acceleration: GravityAcceleration(Vec3::ZERO),
+        },
+    ));
+
+    commands.spawn((
+        MassBodyBundle {
+            mass: Mass(5e15),
+            radius: Radius(10.),
+            meshbundle: MaterialMesh2dBundle {
+                mesh: meshes.add(shape::Circle::new(10.).into()).into(),
+                material: materials.add(Color::rgb(20., 69. / 255., 0.).into()),
+                transform: Transform {
+                    translation: Vec3::new(20., 0.0, 0.0),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            marker: Body,
+            velocity: Velocity(Vec3::ZERO),
+            acceleration: GravityAcceleration(Vec3::ZERO),
         },
     ));
 }
@@ -138,55 +212,14 @@ fn zoom_camera(
     projection.scale = projection.scale.clamp(0.01, 5.0);
 }
 
-fn update_body_states(
-    time: Res<Time>,
-    mut query: Query<(&mut BodyState, &Mass, &mut Transform, Entity), (With<Body>, Without<UserControlled>, Without<Halted>)>,
-) {
-    // Collect data into separate vectors
-    let mut states: Vec<Mut<BodyState>> = Vec::new();
-    let mut masses: Vec<&Mass> = Vec::new();
-    let mut entities: Vec<Entity> = Vec::new();
-    let mut transforms: Vec<Mut<Transform>> = Vec::new();
-
-    for (mut state, mass, transform, entity) in query.iter_mut() {
-        states.push(state);
-        masses.push(mass);
-        entities.push(entity);
-        transforms.push(transform);
-    }
-
-    // Update accelerations
-    for i in 0..states.len() {
-        states[i].acceleration = Vec3::ZERO;
-        for j in 0..states.len() {
-            if i != j {
-                if (transforms[i].translation - transforms[j].translation).length() <  SOFTENING_DISTANCE{
-                    continue;
-                }
-                let acceleration = utils::acceleration(transforms[j].translation, masses[j].0, transforms[i].translation);
-                states[i].acceleration += acceleration;
-            }
-        }
-    }
-
-    // Update positions and velocities
-    for i in 0..states.len() {
-        let state = &mut *states[i];
-        state.velocity += state.acceleration * time.delta_seconds();
-        transforms[i].translation += state.velocity * time.delta_seconds();
-    }
-}
-
-
 fn move_user_states(
-    mut query: Query<(&mut BodyState, &mut Transform), With<UserControlled>>,
+    mut query: Query<(&mut Velocity, &mut Transform), With<UserControlled>>,
     cursor: Res<CursorInfo>,
 ) {
         if let Some(position) = cursor.position() {
-            for (mut state,mut transform) in query.iter_mut() {
+            for (mut velocity,mut transform) in query.iter_mut() {
                 transform.translation = position.extend(0.0);
-                state.velocity = Vec3::ZERO;
-                state.acceleration = Vec3::ZERO;
+                velocity.0 = Vec3::ZERO;
             }
         }
 }

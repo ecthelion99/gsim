@@ -1,12 +1,14 @@
 use bevy::math::IRect;
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
-use crate::utils::{arrow, acceleration};
+use crate::utils::{arrow};
 use crate::mass_bodies::*;
+use crate::newtonian_gravity_plugin::{calc_acceleration};
 
 pub struct AccelerationFieldPlugin {
     pub(crate) field_resolution: Vec2,
     pub(crate) field_size: IRect,
+    pub(crate) arrow_scale: f32,
 }
 
 impl Plugin for AccelerationFieldPlugin {
@@ -15,6 +17,7 @@ impl Plugin for AccelerationFieldPlugin {
             .insert_resource(AccelerationFieldInfo {
             field_resolution: self.field_resolution,
             field_size: self.field_size,
+            arrow_scale: self.arrow_scale,
             max: f32::NEG_INFINITY,
             min: f32::INFINITY,
             })
@@ -28,6 +31,7 @@ impl Plugin for AccelerationFieldPlugin {
 struct AccelerationFieldInfo {
     pub field_resolution: Vec2,
     pub field_size: IRect,
+    pub arrow_scale: f32,
     pub max : f32,
     pub min : f32,
 }
@@ -56,7 +60,7 @@ fn setup(
                         material: materials.add(Color::rgb(1.0, 1.0, 1.0).into()),
                         transform: Transform {
                             translation: position,
-                            scale: acceleration_field_info.field_resolution.extend(0.0)/2.,
+                            scale: acceleration_field_info.field_resolution.extend(0.0)/2.*acceleration_field_info.arrow_scale,
                             ..Default::default()
                         },
                         ..Default::default()
@@ -79,7 +83,7 @@ fn update_acceleration_field(
         let mut total_acceleration = Vec3::ZERO;
         for (mass, transform, radius) in mass_query.iter() {
             if (transform.translation - field_point.position).length() >  radius.0{
-                total_acceleration += acceleration(transform.translation, mass.0, field_point.position);
+                total_acceleration += calc_acceleration(transform.translation, mass.0, field_point.position);
             }
         }
         field_point.acceleration = total_acceleration;

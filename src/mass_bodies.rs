@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_cursor::prelude::*;
 use bevy::sprite::{Material2d, MaterialMesh2dBundle};
+use crate::newtonian_gravity_plugin::{GravityAcceleration};
 
 #[derive(Component)]
 pub struct Body;
@@ -18,10 +19,7 @@ pub struct Radius(pub f32);
 pub struct Arrow;
 
 #[derive(Component)]
-pub struct BodyState {
-    pub velocity: Vec3,
-    pub acceleration: Vec3,
-}
+pub struct Velocity(pub Vec3);
 
 #[derive(Bundle)]
 pub struct MassBodyBundle<M: Material2d> {
@@ -29,7 +27,8 @@ pub struct MassBodyBundle<M: Material2d> {
     pub radius: Radius,
     pub marker: Body,
     pub meshbundle: MaterialMesh2dBundle<M>,
-    pub state: BodyState,
+    pub velocity: Velocity,
+    pub acceleration: GravityAcceleration,
 }
 
 
@@ -88,17 +87,26 @@ pub struct SetVelocityEvent{
 pub struct Halted;
 
 const VELOCITY_SCALE: f32 = 0.1;
-pub fn set_velocity(
+pub fn user_set_velocity(
     mut ev_set_velocity: EventReader<SetVelocityEvent>,
     cursor: Res<CursorInfo>,
-    mut query: Query<(&mut BodyState, &Transform), With<Body>>,
+    mut query: Query<(&mut Velocity, &Transform), With<Body>>,
 ) {
     if let Some(position) = cursor.position() {
         for ev in ev_set_velocity.iter() {
-            if let Ok((mut state, transform)) = query.get_mut(ev.e) {
-                state.velocity = (position.extend(0.0) - transform.translation)*VELOCITY_SCALE;
-                debug!("velocity of entity {:?} set to: {:?}", ev.e, state.velocity);
+            if let Ok((mut velocity, transform)) = query.get_mut(ev.e) {
+                velocity.0 = (position.extend(0.0) - transform.translation)*VELOCITY_SCALE;
             }
         }
+    }
+}
+
+pub fn update_bodies_euler(
+    time: Res<Time>,
+    mut query: Query<(&mut Velocity, & GravityAcceleration, &Mass, &mut Transform), (With<Body>, Without<UserControlled>, Without<Halted>)>,
+) {
+    for (mut velocity, acceleration, mass, mut transform) in query.iter_mut() {
+        velocity.0 += acceleration.0 * time.delta_seconds();
+        transform.translation += velocity.0 * time.delta_seconds();
     }
 }
