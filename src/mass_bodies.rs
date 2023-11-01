@@ -21,6 +21,19 @@ pub struct Arrow;
 #[derive(Component)]
 pub struct Velocity(pub Vec3);
 
+#[derive(Component)]
+pub struct Trail {
+    pub points: Vec<Vec2>,
+}
+
+impl Trail {
+    pub fn new(n: usize) -> Self {
+        Trail {
+            points: Vec::with_capacity(n),
+        }
+    }
+}
+
 #[derive(Bundle)]
 pub struct MassBodyBundle<M: Material2d> {
     pub mass: Mass,
@@ -108,5 +121,31 @@ pub fn update_bodies_euler(
     for (mut velocity, acceleration, mass, mut transform) in query.iter_mut() {
         velocity.0 += acceleration.0 * time.delta_seconds();
         transform.translation += velocity.0 * time.delta_seconds();
+    }
+}
+
+pub fn update_trails(
+    mut query: Query<(&mut Trail, &Transform), (With<Body>, Without<UserControlled>, Without<Halted>)>,
+) {
+    for (mut trail, transform) in query.iter_mut() {
+        if trail.points.len() == trail.points.capacity() {
+            trail.points.remove(0);
+        }
+        trail.points.push(transform.translation.truncate());
+    }
+}
+
+pub fn draw_trails(
+    mut gizmos: Gizmos,
+    materials: Res<Assets<ColorMaterial>>,
+    query: Query<(&Trail, &Handle<ColorMaterial>), With<Body>>) {
+    for (trail, color_handle) in query.iter() {
+        for window in trail.points.windows(2) {
+            let color =  match materials.get(color_handle) {
+                Some(color_material) => color_material.color,
+                None => Color::WHITE,
+            };
+            gizmos.line_2d(window[0], window[1], color);
+        }
     }
 }

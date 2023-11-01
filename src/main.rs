@@ -15,6 +15,7 @@ use crate::acceleration_field_plugin::AccelerationFieldPlugin;
 use crate::mass_bodies::*;
 use crate::newtonian_gravity_plugin::{GravityAcceleration, update_gravity};
 
+const TRAIL_LENGTH: usize = 1800;
 fn main() {
     App::new()
         .add_plugins((DefaultPlugins.set(LogPlugin {
@@ -32,8 +33,11 @@ fn main() {
         .add_systems(Update,
                      (
                          update_gravity.before(update_bodies_euler),
-                         update_bodies_euler, move_user_states,
-                              mouse_click, zoom_camera, user_set_velocity))
+                         update_bodies_euler,
+                         update_trails.before(draw_trails),
+                         draw_trails,
+                         move_user_states,
+                              mouse_click, camera, user_set_velocity))
         .run();
 }
 
@@ -55,7 +59,7 @@ fn setup (
             radius: Radius(2.5),
             meshbundle: MaterialMesh2dBundle {
                 mesh: meshes.add(shape::Circle::new(2.5).into()).into(),
-                material: materials.add(Color::rgb(1., 69. / 255., 0.).into()),
+                material: materials.add(Color::YELLOW_GREEN.into()),
                 transform: Transform {
                     translation: Vec3::new(-150., 0.0, 0.0),
                     ..Default::default()
@@ -66,7 +70,7 @@ fn setup (
             velocity: Velocity(Vec3::new(0.0, 16.0, 0.0)),
             acceleration: GravityAcceleration(Vec3::ZERO),
         },
-
+        Trail::new(600),
     ));
     commands.spawn((
         MassBodyBundle {
@@ -74,7 +78,7 @@ fn setup (
             radius: Radius(2.5),
             meshbundle: MaterialMesh2dBundle {
                 mesh: meshes.add(shape::Circle::new(2.5).into()).into(),
-                material: materials.add(Color::rgb(1., 69. / 255., 0.).into()),
+                material: materials.add(Color::PURPLE.into()),
                 transform: Transform {
                     translation: Vec3::new(-100.0, 0.0, 0.0),
                     ..Default::default()
@@ -85,6 +89,7 @@ fn setup (
             velocity: Velocity(Vec3::new(0.0, -30.0, 0.0)),
             acceleration: GravityAcceleration(Vec3::ZERO),
         },
+        Trail::new(TRAIL_LENGTH),
     ));
 
     commands.spawn((
@@ -93,7 +98,7 @@ fn setup (
             radius: Radius(2.5),
             meshbundle: MaterialMesh2dBundle {
                 mesh: meshes.add(shape::Circle::new(2.5).into()).into(),
-                material: materials.add(Color::rgb(1., 69. / 255., 0.).into()),
+                material: materials.add(Color::YELLOW.into()),
                 transform: Transform {
                     translation: Vec3::new(-400.0, 0.0, 0.0),
                     ..Default::default()
@@ -104,6 +109,7 @@ fn setup (
             velocity: Velocity(Vec3::new(0.0, -10.0, 0.0)),
             acceleration: GravityAcceleration(Vec3::ZERO),
         },
+        Trail::new(TRAIL_LENGTH),
     ));
 
     commands.spawn((
@@ -112,7 +118,7 @@ fn setup (
             radius: Radius(2.5),
             meshbundle: MaterialMesh2dBundle {
                 mesh: meshes.add(shape::Circle::new(2.5).into()).into(),
-                material: materials.add(Color::rgb(1., 69. / 255., 0.).into()),
+                material: materials.add(Color::GREEN.into()),
                 transform: Transform {
                     translation: Vec3::new(-200.0, 0.0, 0.0),
                     ..Default::default()
@@ -123,6 +129,7 @@ fn setup (
             velocity: Velocity(Vec3::new(0.0, -15.0, 0.0)),
             acceleration: GravityAcceleration(Vec3::ZERO),
         },
+        Trail::new(TRAIL_LENGTH),
     ));
 
     commands.spawn((
@@ -131,7 +138,7 @@ fn setup (
             radius: Radius(2.5),
             meshbundle: MaterialMesh2dBundle {
                 mesh: meshes.add(shape::Circle::new(2.5).into()).into(),
-                material: materials.add(Color::rgb(1., 69. / 255., 0.).into()),
+                material: materials.add(Color::MAROON.into()),
                 transform: Transform {
                     translation: Vec3::new(-250.0, 0.0, 0.0),
                     ..Default::default()
@@ -142,6 +149,7 @@ fn setup (
             velocity: Velocity(Vec3::new(0.0, -10.0, 0.0)),
             acceleration: GravityAcceleration(Vec3::ZERO),
         },
+        Trail::new(TRAIL_LENGTH),
     ));
 
 
@@ -151,7 +159,7 @@ fn setup (
             radius: Radius(2.5),
             meshbundle: MaterialMesh2dBundle {
                 mesh: meshes.add(shape::Circle::new(2.5).into()).into(),
-                material: materials.add(Color::rgb(1., 69. / 255., 0.).into()),
+                material: materials.add(Color::TURQUOISE.into()),
                 transform: Transform {
                     translation: Vec3::new(-80., 0.0, 0.0),
                     ..Default::default()
@@ -162,6 +170,7 @@ fn setup (
             velocity: Velocity(Vec3::new(0.0, 50.0, 0.0)),
             acceleration: GravityAcceleration(Vec3::ZERO),
         },
+        Trail::new(TRAIL_LENGTH),
     ));
 
     commands.spawn((
@@ -181,29 +190,44 @@ fn setup (
             velocity: Velocity(Vec3::ZERO),
             acceleration: GravityAcceleration(Vec3::ZERO),
         },
+        Trail::new(TRAIL_LENGTH),
     ));
 }
 
 
-fn zoom_camera(
+fn camera(
     mut key_evr: EventReader<KeyboardInput>,
-    mut q: Query<&mut OrthographicProjection, With<MainCamera>>,
+    mut q: Query<(&mut OrthographicProjection, &mut Transform), With<MainCamera>>,
 ) {
-    let mut projection = q.single_mut();
+    let (mut projection, mut transform) = q.single_mut();
 
     use bevy::input::ButtonState;
 
     const ZOOM_SPEED: f32 = 0.05;
+    const MOVE_SPEED: f32 = 5.0;
 
     for ev in key_evr.iter() {
         match (ev.state, ev.key_code) {
-            (ButtonState::Pressed, Some(KeyCode::Up)) => {
-                projection.scale *= (1.0 - ZOOM_SPEED);
-            },
-            (ButtonState::Pressed, Some(KeyCode::Down)) => {
+            (ButtonState::Pressed, Some(KeyCode::PageUp)) => {
                 projection.scale *= (1.0 + ZOOM_SPEED);
             },
-            _ => {}
+            (ButtonState::Pressed, Some(KeyCode::PageDown)) => {
+                projection.scale *= (1.0 - ZOOM_SPEED);
+            },
+            (ButtonState::Pressed, Some(KeyCode::Up)) => {
+                transform.translation.y += MOVE_SPEED;
+            },
+            (ButtonState::Pressed, Some(KeyCode::Down)) => {
+                transform.translation.y -= MOVE_SPEED;
+            },
+            (ButtonState::Pressed, Some(KeyCode::Left)) => {
+                transform.translation.x -= MOVE_SPEED;
+            },
+            (ButtonState::Pressed, Some(KeyCode::Right)) => {
+                transform.translation.x += MOVE_SPEED;
+            },
+            _ =>{}
+
         }
     }
 
