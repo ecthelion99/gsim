@@ -149,3 +149,15 @@ pub fn draw_trails(
         }
     }
 }
+
+pub fn move_user_controlled_bodies(
+    mut query: Query<(&mut Velocity, &mut Transform), With<UserControlled>>,
+    cursor: Res<CursorInfo>,
+) {
+    if let Some(position) = cursor.position() {
+        for (mut velocity,mut transform) in query.iter_mut() {
+            transform.translation = position.extend(0.0);
+            velocity.0 = Vec3::ZERO;
+        }
+    }
+}

@@ -3,17 +3,16 @@ mod acceleration_field_plugin;
 mod mass_bodies;
 mod constants;
 mod newtonian_gravity_plugin;
+mod camera;
 
-use bevy::input::keyboard::{KeyboardInput, KeyCode};
 use bevy::log::LogPlugin;
-use bevy::math::IRect;
 use bevy::prelude::*;
 use bevy::sprite::{Material2d, MaterialMesh2dBundle};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_cursor::prelude::*;
-use crate::acceleration_field_plugin::AccelerationFieldPlugin;
 use crate::mass_bodies::*;
 use crate::newtonian_gravity_plugin::{GravityAcceleration, update_gravity};
+use crate::camera::{MainCamera, camera};
 
 const TRAIL_LENGTH: usize = 1800;
 fn main() {
@@ -36,13 +35,10 @@ fn main() {
                          update_bodies_euler,
                          update_trails.before(draw_trails),
                          draw_trails,
-                         move_user_states,
+                         move_user_controlled_bodies,
                               mouse_click, camera, user_set_velocity))
         .run();
 }
-
-#[derive(Component)]
-struct MainCamera;
 
 fn setup (
     mut commands: Commands,
@@ -195,55 +191,3 @@ fn setup (
 }
 
 
-fn camera(
-    mut key_evr: EventReader<KeyboardInput>,
-    mut q: Query<(&mut OrthographicProjection, &mut Transform), With<MainCamera>>,
-) {
-    let (mut projection, mut transform) = q.single_mut();
-
-    use bevy::input::ButtonState;
-
-    const ZOOM_SPEED: f32 = 0.05;
-    const MOVE_SPEED: f32 = 5.0;
-
-    for ev in key_evr.iter() {
-        match (ev.state, ev.key_code) {
-            (ButtonState::Pressed, Some(KeyCode::PageUp)) => {
-                projection.scale *= (1.0 + ZOOM_SPEED);
-            },
-            (ButtonState::Pressed, Some(KeyCode::PageDown)) => {
-                projection.scale *= (1.0 - ZOOM_SPEED);
-            },
-            (ButtonState::Pressed, Some(KeyCode::Up)) => {
-                transform.translation.y += MOVE_SPEED;
-            },
-            (ButtonState::Pressed, Some(KeyCode::Down)) => {
-                transform.translation.y -= MOVE_SPEED;
-            },
-            (ButtonState::Pressed, Some(KeyCode::Left)) => {
-                transform.translation.x -= MOVE_SPEED;
-            },
-            (ButtonState::Pressed, Some(KeyCode::Right)) => {
-                transform.translation.x += MOVE_SPEED;
-            },
-            _ =>{}
-
-        }
-    }
-
-    // always ensure you end up with sane values
-    // (pick an upper and lower bound for your application)
-    projection.scale = projection.scale.clamp(0.01, 5.0);
-}
-
-fn move_user_states(
-    mut query: Query<(&mut Velocity, &mut Transform), With<UserControlled>>,
-    cursor: Res<CursorInfo>,
-) {
-        if let Some(position) = cursor.position() {
-            for (mut velocity,mut transform) in query.iter_mut() {
-                transform.translation = position.extend(0.0);
-                velocity.0 = Vec3::ZERO;
-            }
-        }
-}
