@@ -5,6 +5,8 @@ mod constants;
 mod newtonian_gravity_plugin;
 mod camera;
 
+use bevy::input::ButtonState;
+use bevy::input::keyboard::KeyboardInput;
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use bevy::sprite::{Material2d, MaterialMesh2dBundle};
@@ -21,23 +23,55 @@ fn main() {
             level: bevy::log::Level::DEBUG,
             ..default()
         }), CursorInfoPlugin))
-        .add_plugins(WorldInspectorPlugin::new())
         // .add_plugins(AccelerationFieldPlugin{
         //     field_resolution: Vec2::new(5., 5.),
         //     field_size: IRect::new(-64, -36, 65, 37),
         //     arrow_scale: 0.5,
         // })
+        .add_state::<GameState>()
         .add_event::<SetVelocityEvent>()
         .add_systems(Startup, setup)
         .add_systems(Update,
                      (
-                         update_gravity.before(update_bodies_euler),
+                         (update_gravity.before(update_bodies_euler),
                          update_bodies_euler,
-                         update_trails.before(draw_trails),
+                         update_trails.before(draw_trails)).run_if(in_state(GameState::InGame)),
                          draw_trails,
                          move_user_controlled_bodies,
-                              mouse_click, camera, user_set_velocity))
+                         mouse_click, camera, user_set_velocity,
+                         pause,))
         .run();
+}
+
+#[derive(States, PartialEq, Eq, Debug, Clone, Hash, Default)]
+pub enum GameState {
+    #[default]
+    InGame,
+    Paused,
+}
+
+pub fn pause(
+    mut key_evr: EventReader<KeyboardInput>,
+    state: Res<State<GameState>>,
+    mut next_state: ResMut<NextState<GameState>>
+) {
+
+    for ev in key_evr.iter() {
+        match (ev.state, ev.key_code) {
+            (ButtonState::Pressed, Some(KeyCode::Space)) => {
+                match state.get() {
+                    GameState::InGame => {
+                        next_state.set(GameState::Paused);
+                    },
+                    GameState::Paused => {
+                        next_state.set(GameState::InGame);
+                    },
+                }
+            },
+            _ =>{}
+
+        }
+    }
 }
 
 fn setup (
